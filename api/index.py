@@ -1,7 +1,7 @@
 import hashlib
 import json
 import os
-from flask import Flask, request
+from flask import Flask, request, Response
 
 app = Flask(__name__)
 
@@ -14,17 +14,29 @@ with open(file_path, "r") as f:
 
 @app.route("/api")
 def get_matching_shows():
-    if "q" not in request.args:
-        return json.dumps([])
+    jsonp = False
+    if "callback" in request.args:
+        jsonp = True
 
     matching_shows = []
-    for show in shows:
-        if request.args["q"] in show.lower():
-            matching_shows.append(
-                {
-                    "id": hashlib.md5(show.encode()).hexdigest(),
-                    "name": show,
-                }
-            )
+    if "q" in request.args:
+        for show in shows:
+            if request.args["q"] in show.lower():
+                matching_shows.append(
+                    {
+                        "id": hashlib.md5(show.encode()).hexdigest(),
+                        "name": show,
+                    }
+                )
 
-    return json.dumps(matching_shows)
+    response_str = json.dumps(matching_shows)
+    if jsonp:
+        response_str = f"{request.args['callback']}({response_str})"
+
+    resp = Response(response_str)
+    if jsonp:
+        resp.headers['Content-Type'] = 'application/javascript'
+    else:
+        resp.headers['Content-Type'] = 'application/json'
+
+    return resp
